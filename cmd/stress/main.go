@@ -32,20 +32,20 @@ Usage:
   stress -h | --help
 
 Options:
-  --debug				    Enable debug
-  --testnet					Enable testnet mode
-  --ringsize=<size>		    Ring Size for each TX generated
+  --debug                   Enable debug
+  --testnet                 Enable testnet mode
+  --ringsize=<size>         Ring Size for each TX generated
   --total-accounts=<amount> Maximum of generated accounts and TXs sent at same time
   --main-address=<address>  Main DERO address (receiver) of all these TXs
   --daemon-address=<host:port> Use daemon instance at <host>:<port> or https://domain
-  --threads=<threads> 	    Number of threads used
-  --use-disk        		Load & save wallets on disk
-  --registration-only   	send registration TX only
-  --mode=<0|1|2>			Default set to 0. 0: Wait & send in one time. 1: Send at each tx created. 2: Spam until stopped
-  --rounds=<value>			Used by spam mode. How many time you want to repeat the spam
+  --threads=<threads>       Number of threads used
+  --use-disk                Load & save wallets on disk
+  --registration-only       send registration TX only
+  --mode=<0|1|2>            Default set to 0. 0: Wait & send in one time. 1: Send at each tx created. 2: Spam until stopped
+  --rounds=<value>          Used by spam mode. How many time you want to repeat the spam
   --amount-transferred=<amount> Amount transferred on each transaction
-  --output=<filename>		Record all txs sent to daemon in filename
-  --wait-n-blocks=<amount>  Wait N blocks before fetching txs for --output option.
+  --output=<filename>       Record all txs sent to daemon in filename
+  --wait-n-blocks=<amount>  Wait N blocks before fetching txs for output option.
   --use-sc-config=<filename> Use configuration to send SC TXs
   --generate-example-sc-config=<filename> Generate an example SC Config
 `
@@ -104,7 +104,6 @@ func main() {
 		fmt.Println("Error while parsing options err:", err)
 	}
 	globals.Arguments = Arguments
-	globals.Arguments["--testnet"] = true
 	walletapi.Initialize_LookupTable(1, 1<<20)
 	globals.Initialize()
 

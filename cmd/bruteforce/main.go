@@ -21,13 +21,13 @@ Usage:
   bruteforce -h | --help
 
 Options:
-  --debug				    		Enable debug
-  --languages						Show languages available
-  --expected-address=<address> 	    Expected DERO Address
-  --seed=<seed>						Seed
-  --language=<id>					Seed language
-  --mode=<number>					Available: Missing Words (0), Invalid Order (1)
-  --threads=<threads> 	    		Number of threads used
+  --debug                           Enable debug
+  --languages                       Show languages available
+  --expected-address=<address>      Expected DERO Address
+  --seed=<seed>                     Seed
+  --language=<id>                   Seed language
+  --mode=<number>                   Available: Missing Words (0), Invalid Order (1)
+  --threads=<threads>               Number of threads used
 `
 
 type BruteforceMode int

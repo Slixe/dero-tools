@@ -20,8 +20,8 @@ Usage:
   simulator -h | --help
 
 Options:
-  --debug				    Enable debug
-  --accounts=<amount>		Amount of accounts generated
+  --debug                      Enable debug
+  --accounts=<amount>          Amount of accounts generated
   --daemon-address=<host:port> Use daemon instance at <host>:<port> or https://domain
 `
 
