@@ -457,8 +457,6 @@ func createThreadAccounts(thread int) {
 			if !account.IsRegistered() || account.Get_Registration_TopoHeight() == -1 {
 				allOK = false
 				break current
-			} else {
-				fmt.Println("ACCOUNT IS REGISTERED!", account.Get_Registration_TopoHeight())
 			}
 		}
 
