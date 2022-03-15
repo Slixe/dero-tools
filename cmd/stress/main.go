@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/deroproject/derohe/config"
@@ -48,6 +49,9 @@ Options:
   --wait-n-blocks=<amount>  Wait N blocks before fetching txs for output option.
   --use-sc-config=<filename> Use configuration to send SC TXs
   --generate-example-sc-config=<filename> Generate an example SC Config
+  --repeat-tx=<value>       Send the TX N times to the node
+  --skip-pow                Skip Registration TX PoW
+  --empty-tx                Send Empty TX
 `
 
 type SCConfig struct {
@@ -80,6 +84,9 @@ var rounds = 1
 var waitNblocks = int64(1)
 var scConfig SCConfig
 var useSC = false
+var repeatTX = 1
+var skipPOW = false
+var emptyTX = false
 // TODO Replace fmt.Println with logger
 
 var txSent int32 = 0
@@ -263,6 +270,28 @@ func main() {
 		waitNblocks = int64(intValue)
 	}
 
+	if value := globals.Arguments["--repeat-tx"]; value != nil {
+		intValue, err := strconv.Atoi(value.(string))
+		if err != nil {
+			panic(err)
+		}
+
+		if intValue < 1 {
+			intValue = 1
+			fmt.Println("Minimum number of repeat TX is 1!")
+			return
+		}
+		repeatTX = intValue
+	}
+
+	if value := globals.Arguments["--skip-pow"]; value != nil {
+		skipPOW = value.(bool)
+	}
+
+	if value := globals.Arguments["--empty-tx"]; value != nil {
+		emptyTX = value.(bool)
+	}
+
 	if value := globals.Arguments["--use-sc-config"]; value != nil {
 		filename := value.(string)
 		bytes, err := ioutil.ReadFile(filename)
@@ -322,6 +351,9 @@ func main() {
 		fmt.Println("Output:", txsFilename)
 		fmt.Println("Will wait", waitNblocks, "blocks before fetching txs from daemon")
 	}
+	fmt.Println("Repeat TX:", repeatTX)
+	fmt.Println("Skip POW:", skipPOW)
+	fmt.Println("Empty TX:", emptyTX)
 	fmt.Println("Use SC Config:", useSC)
 
 	go walletapi.Keep_Connectivity()
@@ -379,19 +411,22 @@ func createThreadAccounts(thread int) {
 			start := time.Now()
 			for {
 				txReg = account.GetRegistrationTX()
-				hash := txReg.GetHash()
-				if hash[0] == 0 || hash[1] == 0 {
+				if !skipPOW {
+					hash := txReg.GetHash()
+					if hash[0] == 0 && hash[1] == 0 && hash[2] <= 0x3 {
+						break
+					}
+				} else {
 					break
 				}
 			}
-			elapsed := time.Since(start)
-			fmt.Printf("Thread #%d: TX Registration PoW took %s\n", thread, elapsed)
+			if debug {
+				elapsed := time.Since(start)
+				fmt.Printf("Thread #%d: TX Registration PoW took %s\n", thread, elapsed)
+			}
 
 			if mode == OnCreation || mode == Spam {
-				err := account.SendTransaction(txReg)
-				if err != nil {
-					fmt.Println("Error while sending registration tx:", err)
-				}
+				sendTx(account, txReg)
 			} else {
 				transactions = append(transactions, txReg)
 			}
@@ -410,23 +445,35 @@ func createThreadAccounts(thread int) {
 	if len(transactions) > 0 {
 		fmt.Println("Start sending TX registrations!")
 		for _, tx := range transactions {
-			err := lastWallet.SendTransaction(tx)
-			if err != nil {
-				if debug {
-					fmt.Println("Error while sending TX (registration):", err)
-				}
-			}
+			sendTx(lastWallet, tx)
 		}
 	}
 
-	fmt.Println("Thread", thread, "Waiting on last wallet to be registered")
-	for !lastWallet.IsRegistered() {
-		if balance, _ := lastWallet.Get_Balance(); balance > 0 || lastWallet.Get_Registration_TopoHeight() != -1 {
+	fmt.Println("Thread", thread, "Waiting on wallets to be registered")
+
+	for {
+		allOK := true
+		current: for _, account := range accounts {
+			if !account.IsRegistered() || account.Get_Registration_TopoHeight() == -1 {
+				allOK = false
+				break current
+			} else {
+				fmt.Println("ACCOUNT IS REGISTERED!", account.Get_Registration_TopoHeight())
+			}
+		}
+
+		if allOK {
 			break
 		}
 		time.Sleep(1 * time.Second)
 	}
-	fmt.Println("Last Wallet is registered! We suppose all others are too!")
+
+	currentHeight := lastWallet.Get_Daemon_TopoHeight()
+	for currentHeight + 5  >= lastWallet.Get_Daemon_TopoHeight() { // wait on 5 blocks
+		time.Sleep(1 * time.Second)
+	}
+
+	fmt.Println("All accounts are registered!")
 
 	if useSC {
 		scMutex.Lock() // faster thread will deploy SC if necessary
@@ -496,7 +543,6 @@ func createThreadAccounts(thread int) {
 			for _, account := range accounts {
 				start := time.Now()
 				tx, err := generateTx(account)
-				atomic.AddInt32(&txTotal, 1)
 				if err != nil {
 					atomic.AddInt32(&txError, 1)
 					if debug {
@@ -569,25 +615,32 @@ func createThreadAccounts(thread int) {
 func generateTx(account *walletapi.Wallet_Memory) (tx *transaction.Transaction, err error) {
 	if useSC {
 		tx, err = account.TransferPayload0([]rpc.Transfer{}, ringSize, false, scConfig.Arguments, 0, false)
+	} else if emptyTX {
+		tx, err = account.TransferPayload0([]rpc.Transfer{}, ringSize, false, rpc.Arguments{}, 0, false)
 	} else {
 		tx, err = account.TransferPayload0([]rpc.Transfer{{Amount: amount, Destination: mainAddress.String(), Payload_RPC: rpc.Arguments{}}}, ringSize, false, rpc.Arguments{}, 0, false)
 	}
-
 	return
 }
 
 func sendTx(wallet *walletapi.Wallet_Memory, tx *transaction.Transaction) {
-	err := wallet.SendTransaction(tx)
-	if err != nil {
-		atomic.AddInt32(&txError, 1)
+	atomic.AddInt32(&txTotal, 1)
+	for i := 0; i < repeatTX; i++ {
 		if debug {
-			fmt.Println("Error while sending TX:", err)
+			fmt.Println("TX Size:", len(hex.EncodeToString(tx.Serialize()))) // show hex size
 		}
-	} else {
-		atomic.AddInt32(&txSent, 1)
-		txsMutex.Lock()
-		txs = append(txs, tx.GetHash())
-		txsMutex.Unlock()
+		err := wallet.SendTransaction(tx)
+		if err != nil {
+			atomic.AddInt32(&txError, 1)
+			if debug {
+				fmt.Println("Error while sending TX:", err)
+			}
+		} else {
+			atomic.AddInt32(&txSent, 1)
+			txsMutex.Lock()
+			txs = append(txs, tx.GetHash())
+			txsMutex.Unlock()
+		}
 	}
 }
 
