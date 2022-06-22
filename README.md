@@ -4,7 +4,6 @@
 Allows generating in a simple way and without connection, a `DERO address`, the associated `seed`, and the valid TX Registration.
 To validate the account creation on blockchain, you must propagate the `TX Registration hex` using [API](https://docs.dero.io/rtd_pages/dev_rpcapistargate.html#send-raw-transaction).
 
-
 #### Stress Test
 Allows to generate a lot of transactions (registration, normal or SC) in record time, based on the different parameters.
 

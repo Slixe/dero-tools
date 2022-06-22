@@ -9,6 +9,7 @@ import (
 	"github.com/deroproject/derohe/walletapi"
 	"github.com/deroproject/derohe/walletapi/mnemonics"
 	"github.com/docopt/docopt-go"
+	"runtime"
 	"strconv"
 )
 
@@ -27,12 +28,12 @@ Options:
 var language mnemonics.Language
 
 func main() {
-	Arguments, err := docopt.Parse(cmd, nil, true, "DERO ColdWallet", false)
+	arguments, err := docopt.Parse(cmd, nil, true, "DERO ColdWallet", false)
 	if err != nil {
 		fmt.Println("Error while parsing options err:", err)
 	}
 
-	globals.Arguments = Arguments
+	globals.Arguments = arguments
 	globals.Arguments["--debug"] = false
 	globals.Arguments["--testnet"] = false
 	globals.Initialize()
@@ -75,15 +76,22 @@ func main() {
 	fmt.Println("SEED:", w.GetSeedinLanguage(language.Name))
 	fmt.Println("Generating valid TX Registration... This can take up to 2hours!")
 
-	var regTx *transaction.Transaction
-	for {
-		regTx = w.GetRegistrationTX()
-		hash := regTx.GetHash()
-		if hash[0] == 0 && hash[1] == 0 && hash[2] <= 0x3 {
-			break
-		}
+	txChan := make(chan *transaction.Transaction)
+	counter := 0
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		go func() {
+			for counter == 0 {
+				tx := w.GetRegistrationTX()
+				hash := tx.GetHash()
+				if hash[0] == 0 && hash[1] == 0 && hash[2] == 0 {
+					txChan <- tx
+					counter++
+					break
+				}
+			}
+		}()
 	}
-
+	regTx := <- txChan
 	fmt.Println("Tx Registration hex:", hex.EncodeToString(regTx.Serialize()))
 	fmt.Println("you must propagate the registration transaction yourself (through SendRawTransaction API) for your account to be valid and registered on the blockchain!")
 }

@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-var cmd = `DERO Bruteforce by Slixe
+var cmd = `DERO Bruteforce for Atlantis version by Slixe
 DERO : A secure, private blockchain with smart-contracts
 
 Usage:

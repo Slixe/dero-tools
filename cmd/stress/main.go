@@ -413,7 +413,7 @@ func createThreadAccounts(thread int) {
 				txReg = account.GetRegistrationTX()
 				if !skipPOW {
 					hash := txReg.GetHash()
-					if hash[0] == 0 && hash[1] == 0 && hash[2] <= 0x3 {
+					if hash[0] == 0 && hash[1] == 0 && hash[2] == 0 {
 						break
 					}
 				} else {
